@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sentinel — Investigations desk</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/react-force-graph-2d@1.25.5/dist/react-force-graph-2d.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--x:0}
+:root,[data-theme=ledger]{--paper:#e8ede6;--card:rgba(246,248,242,.86);--ink:#16211d;--mut:#5b6961;--rule:#c3cdc4;--stage:rgba(12,24,19,.72);--acc:#c62828;--acc2:#3f4bb8;--spot:rgba(198,40,40,.13);--b1:rgba(127,181,154,.5);--b2:rgba(229,160,150,.4);--b3:rgba(150,165,230,.4);--pt:rgba(40,70,60,.45)}
+[data-theme=midnight]{--paper:#060a14;--card:rgba(12,19,36,.82);--ink:#e3eaf8;--mut:#8593b0;--rule:#1c2946;--stage:rgba(3,6,14,.6);--acc:#ff5a64;--acc2:#5b8cff;--spot:rgba(91,140,255,.16);--b1:rgba(59,91,219,.4);--b2:rgba(255,77,94,.25);--b3:rgba(34,184,207,.28);--pt:rgba(150,180,255,.5)}
+[data-theme=ember]{--paper:#130b09;--card:rgba(30,17,12,.82);--ink:#f5e8de;--mut:#b59d8d;--rule:#3b261a;--stage:rgba(12,6,4,.6);--acc:#ff7a45;--acc2:#ffb020;--spot:rgba(255,122,69,.16);--b1:rgba(255,106,61,.34);--b2:rgba(255,176,32,.25);--b3:rgba(194,37,92,.3);--pt:rgba(255,190,140,.5)}
+[data-theme=aurora]{--paper:#05100e;--card:rgba(8,26,22,.82);--ink:#d9f4ea;--mut:#84b3a5;--rule:#173a32;--stage:rgba(3,12,10,.6);--acc:#2ee6a6;--acc2:#8b7bff;--spot:rgba(46,230,166,.15);--b1:rgba(32,201,151,.34);--b2:rgba(121,80,242,.34);--b3:rgba(21,170,191,.3);--pt:rgba(150,255,220,.5)}
+@media print{html,body,.h-screen,aside,main{overflow:visible!important;height:auto!important;max-height:none!important}body *{visibility:hidden!important}.print-area,.print-area *{visibility:visible!important}.print-area{position:absolute;left:0;top:0;width:100%;color:#000}}
+kbd{font-family:'Courier Prime',monospace;font-size:11px;padding:1px 5px;border-radius:4px;border:1px solid var(--rule)}
+.shiny{background:linear-gradient(110deg,var(--ink) 35%,var(--acc) 50%,var(--ink) 65%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 3.4s linear infinite}
+@keyframes shine{from{background-position:120% 0}to{background-position:-120% 0}}
+.blurin{display:inline-block;animation:bl .6s both}@keyframes bl{from{filter:blur(8px);opacity:0;transform:translateY(8px)}to{filter:blur(0);opacity:1;transform:none}}
+
+body{background:var(--paper);color:var(--ink);font-family:'Instrument Sans',system-ui,sans-serif;overflow:hidden}
+.serif{font-family:'Source Serif 4',Georgia,serif}.cn{font-family:'Courier Prime',monospace}.mut{color:var(--mut)}
+.stamp{display:inline-block;border:2px solid;outline:1px solid;outline-offset:2px;padding:1px 10px;border-radius:3px;transform:rotate(-4deg);font:700 13px 'Courier Prime',monospace;letter-spacing:.14em;opacity:.92}
+::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:#b3bfb6;border-radius:9px}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #3f4bb8;outline-offset:2px}
+@keyframes slide{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}.slide{animation:slide .2s ease-out}
+input[type=range]{accent-color:#e5484d}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
+<body><div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useMemo,useRef}=React;
+const RK={HIGH:'#e5484d',MEDIUM:'#d98a12',LOW:'#4a9cc9'};
+const KN={CIRCULAR_TRANSFER:'Circular flow',STRUCTURING:'Structuring',PROFILE_MISMATCH:'Profile mismatch',INSIDER_LINK:'Insider link'};
+const kindOf=t=>/loop/.test(t)?'CIRCULAR_TRANSFER':/threshold/.test(t)?'STRUCTURING':/isolated/.test(t)?'PROFILE_MISMATCH':'INSIDER_LINK';
+const inr=n=>'₹'+Number(n).toLocaleString('en-IN');
+const lakh=n=>n>=1e5?'₹'+(n/1e5).toFixed(1)+' lakh':inr(n);
+const headline=a=>a.kinds.includes('CIRCULAR_TRANSFER')?`${a.accounts.length} accounts passed ${lakh(a.total)} around in a loop`:a.kinds.includes('STRUCTURING')?'Payments split to stay under the ₹2 lakh limit':'One account acting unlike its profile';
+const api=(u,o)=>fetch(u,o).then(r=>r.json());
+const post=(u,v)=>api(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:v})});
+const Btn=({children,onClick,v='line',busy})=>{const s={solid:{background:'var(--ink)',color:'var(--paper)'},line:{border:'1px solid var(--ink)'},link:{textDecoration:'underline',textUnderlineOffset:3}}[v];
+  return <button onClick={onClick} disabled={busy} className="px-3.5 py-2 rounded text-sm font-medium transition hover:opacity-80 disabled:opacity-50" style={s}>{busy?'One moment…':children}</button>};
+const Ghost=({children,onClick})=><button onClick={onClick} className="px-2.5 py-1 rounded text-xs transition hover:bg-white/10" style={{border:'1px solid #3a4b42',color:'#cfdad2'}}>{children}</button>;
+
+function Graph({alert,pred}){
+  const box=useRef(),fg=useRef(),[sz,setSz]=useState({w:600,h:500}),[hov,setHov]=useState(null),[mp,setMp]=useState({x:0,y:0}),[ctx,setCtx]=useState(true),[playing,setPlaying]=useState(false);
+  const max=alert.links.filter(l=>l.bad).length,[step,setStep]=useState(max);
+  useEffect(()=>{const f=()=>box.current&&setSz({w:box.current.clientWidth,h:box.current.clientHeight});f();const ro=new ResizeObserver(f);ro.observe(box.current);return()=>ro.disconnect()},[]);
+  useEffect(()=>{setStep(max);setPlaying(false);setHov(null);setTimeout(()=>fg.current&&fg.current.zoomToFit(600,90),1000)},[alert.id,max]);
+  useEffect(()=>{const f=()=>{setStep(0);setPlaying(true)};addEventListener('sentinel:replay',f);return()=>removeEventListener('sentinel:replay',f)},[]);
+  useEffect(()=>{if(!playing)return;const id=setInterval(()=>setStep(s=>{if(s>=max){setPlaying(false);return s}return s+1}),750);return()=>clearInterval(id)},[playing,max]);
+  const data=useMemo(()=>{let i=0;const nodes=alert.nodes.map(n=>({...n})),links=alert.links.map(l=>({...l,_i:l.bad?i++:-1}));
+    if(pred)pred.candidates.forEach(c=>{let n=nodes.find(n=>n.id===c.id);if(!n){n={id:c.id,kind:'acct'};nodes.push(n)}n.pred=c.prob;links.push({source:pred.tail,target:c.id,pred:true,amt:0,_i:-1})});
+    return{nodes,links}},[alert,pred]);
+  const id=x=>x.id||x;
+  const lit=useMemo(()=>{const s=new Set();data.links.forEach(l=>{if(l.bad&&l._i<step){s.add(id(l.source));s.add(id(l.target))}});return s},[data,step,hov]);
+  const nb=useMemo(()=>{if(!hov)return null;const s=new Set([hov.id]);data.links.forEach(l=>{if(id(l.source)===hov.id)s.add(id(l.target));if(id(l.target)===hov.id)s.add(id(l.source))});return s},[hov,data]);
+  const touch=hov&&data.links.filter(l=>l.amt&&(id(l.source)===hov.id||id(l.target)===hov.id));
+  return <div ref={box} className="absolute inset-0" onMouseMove={e=>{const r=box.current.getBoundingClientRect();setMp({x:e.clientX-r.left,y:e.clientY-r.top})}}
+    style={{background:'var(--stage)',backgroundImage:'linear-gradient(#ffffff09 1px,transparent 1px),linear-gradient(90deg,#ffffff09 1px,transparent 1px)',backgroundSize:'28px 28px'}}>
+    <ForceGraph2D ref={fg} width={sz.w} height={sz.h} graphData={data} backgroundColor="rgba(0,0,0,0)" cooldownTicks={140} d3VelocityDecay={.3}
+      onNodeHover={n=>setHov(n||null)} nodeVisibility={n=>ctx||n.bad||n.kind==='emp'||!!n.pred}
+      linkVisibility={l=>l.bad?l._i<step:(ctx||l.kind==='emp'||l.pred)}
+      linkColor={l=>{const dim=nb&&!(nb.has(id(l.source))&&nb.has(id(l.target)));const c=l.pred?'#f2b340':l.kind==='emp'?'#9aa3ff':l.bad?'#e5484d':'#3c5147';return dim?c+'40':c}}
+      linkWidth={l=>l.bad?2.4:1} linkLineDash={l=>l.pred||l.kind==='emp'?[4,3]:null}
+      linkDirectionalArrowLength={l=>l.kind==='emp'?0:6} linkDirectionalArrowRelPos={.92}
+      linkDirectionalParticles={l=>l.bad?2:0} linkDirectionalParticleWidth={2.6} linkDirectionalParticleColor={()=>'#ffd9d6'}
+      linkCanvasObjectMode={l=>l.bad?'after':undefined}
+      linkCanvasObject={(l,c,gs)=>{const s=l.source,t=l.target;if(!s.x||!t.x)return;c.font=`${Math.max(9/gs,3)}px 'Courier Prime'`;c.textAlign='center';c.fillStyle='#f3cfcb';c.fillText(lakh(l.amt).replace(' lakh','L'),(s.x+t.x)/2,(s.y+t.y)/2-4)}}
+      nodeCanvasObject={(n,c,gs)=>{const on=n.bad&&lit.has(n.id),col=n.pred?'#f2b340':n.kind==='emp'?'#9aa3ff':on?'#e5484d':'#7f9488';
+        c.save();c.globalAlpha=nb&&!nb.has(n.id)?.25:1;c.fillStyle=col;c.beginPath();
+        if(n.kind==='emp')c.rect(n.x-7,n.y-7,14,14);else c.arc(n.x,n.y,on?7:n.pred?6:4,0,7);c.fill();
+        if(on){c.strokeStyle='#f3efe4';c.lineWidth=1.5;c.stroke()}
+        if(n.pred){c.setLineDash([3,2]);c.strokeStyle='#f2b340';c.beginPath();c.arc(n.x,n.y,11,0,7);c.stroke()}
+        if(gs>.85||on||n.pred||n.kind==='emp'){c.font=`${Math.max(10/gs,3.4)}px 'Courier Prime'`;c.fillStyle='#cfdad2';c.textAlign='center';c.fillText(n.pred?`${n.id} · ${Math.round(n.pred*100)}%`:n.id,n.x,n.y+17)}
+        c.restore()}}
+      nodePointerAreaPaint={(n,col,c)=>{c.fillStyle=col;c.beginPath();c.arc(n.x,n.y,11,0,7);c.fill()}}/>
+    <div className="absolute top-5 left-6 max-w-sm pointer-events-none">
+      <p className="cn text-xs" style={{color:'#8fa398'}}>Case {alert.id}{alert.employee?` · insider ${alert.employee}`:''}</p>
+      <h2 className="serif text-2xl mt-1 leading-snug" style={{color:'#f1eee3'}}><BlurText key={alert.id} text={headline(alert)}/></h2></div>
+    <div className="absolute top-5 right-5 flex gap-2">
+      {max>1&&<Ghost onClick={()=>{setStep(0);setPlaying(true)}}>▶ Replay the money</Ghost>}
+      <Ghost onClick={()=>fg.current.zoomToFit(500,90)}>Recenter</Ghost>
+      <Ghost onClick={()=>setCtx(!ctx)}>{ctx?'Hide':'Show'} other accounts</Ghost></div>
+    {max>1&&<div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-3 w-[min(380px,70%)]">
+      <span className="cn text-xs whitespace-nowrap" style={{color:'#8fa398'}}>transfer {step} of {max}</span>
+      <input aria-label="Step through flagged transfers" type="range" min="0" max={max} value={step} onChange={e=>{setPlaying(false);setStep(+e.target.value)}} className="flex-1"/></div>}
+    <div className="absolute bottom-5 left-6 text-xs space-y-1" style={{color:'#8fa398'}}>
+      {[['#e5484d','flagged account'],['#7f9488','ordinary account'],['#9aa3ff','bank employee'],['#f2b340','model’s guess for next hop']].map(([c,l])=><div key={l}><i className="inline-block w-2 h-2 mr-2 rounded-full" style={{background:c}}/>{l}</div>)}</div>
+    {hov&&<div className="absolute rounded px-2.5 py-1.5 text-xs pointer-events-none shadow-lg" style={{left:mp.x+14,top:mp.y+14,background:'#f1eee3',color:'var(--ink)'}}>
+      <b className="cn">{hov.id}</b><div className="mut">{hov.kind==='emp'?'Bank employee':hov.pred?`Guess: ${Math.round(hov.pred*100)}% likely next`:`${touch.length} transfers on screen, ${lakh(touch.reduce((s,l)=>s+l.amt,0))}`}</div></div>}
+  </div>}
+
+function Sar({sar,onClose}){
+  useEffect(()=>{const k=e=>e.key==='Escape'&&onClose();window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k)},[]);
+  return <div className="fixed inset-0 z-50 flex justify-end" style={{background:'#0f1a168c'}} onClick={onClose}>
+    <div className="slide w-[min(560px,100%)] h-full p-8 overflow-y-auto" style={{background:'#fbfcf8',color:'#16211d','--mut':'#5b6961','--ink':'#16211d','--paper':'#fbfcf8'}} onClick={e=>e.stopPropagation()}>
+      <p className="cn text-xs mut">Draft · written by {sar.model} from the alert’s structured data</p>
+      <h2 className="serif text-2xl font-semibold mt-2">Suspicious Activity Report</h2>
+      <p className="text-sm mut mt-1">Read it through and edit before anything is filed.</p>
+      <pre className="serif mt-6 whitespace-pre-wrap text-[15px] leading-relaxed">{sar.text}</pre>
+      <div className="flex gap-2 mt-6"><Btn v="solid" onClick={()=>navigator.clipboard.writeText(sar.text)}>Copy text</Btn>
+        <Btn onClick={()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([sar.text]));a.download='SAR-draft.txt';a.click()}}>Download</Btn><Btn v="link" onClick={onClose}>Close</Btn></div></div></div>}
+
+
+const THEMES={ledger:'Ledger',midnight:'Midnight',ember:'Ember',aurora:'Aurora'};
+const SW={ledger:['#e8ede6','#c62828'],midnight:['#0c1324','#5b8cff'],ember:['#1e110c','#ff7a45'],aurora:['#081a16','#2ee6a6']};
+function Bg(){const ref=useRef();useEffect(()=>{const c=ref.current,x=c.getContext('2d');let raf,w,h;
+  const P=Array.from({length:70},()=>({x:Math.random(),y:Math.random(),vx:(Math.random()-.5)*4e-4,vy:(Math.random()-.5)*4e-4}));
+  const fit=()=>{w=c.width=innerWidth;h=c.height=innerHeight};fit();addEventListener('resize',fit);
+  const draw=t=>{const cs=getComputedStyle(document.documentElement),pc=cs.getPropertyValue('--pt').trim();x.clearRect(0,0,w,h);
+    ['--b1','--b2','--b3'].forEach((v,i)=>{const cx=w*(.5+.38*Math.sin(t/9000+i*2.1)),cy=h*(.5+.34*Math.cos(t/11000+i*1.7)),g=x.createRadialGradient(cx,cy,0,cx,cy,Math.max(w,h)*.42);g.addColorStop(0,cs.getPropertyValue(v).trim());g.addColorStop(1,'transparent');x.fillStyle=g;x.fillRect(0,0,w,h)});
+    x.strokeStyle=pc;x.fillStyle=pc;P.forEach((p,i)=>{p.x=(p.x+p.vx*16+1)%1;p.y=(p.y+p.vy*16+1)%1;x.beginPath();x.arc(p.x*w,p.y*h,1.4,0,7);x.fill();
+      for(let j=i+1;j<P.length;j++){const q=P[j],d=Math.hypot((p.x-q.x)*w,(p.y-q.y)*h);if(d<110){x.globalAlpha=(1-d/110)*.6;x.beginPath();x.moveTo(p.x*w,p.y*h);x.lineTo(q.x*w,q.y*h);x.stroke();x.globalAlpha=1}}});
+    raf=requestAnimationFrame(draw)};raf=requestAnimationFrame(draw);return()=>{cancelAnimationFrame(raf);removeEventListener('resize',fit)}},[]);
+  return <canvas ref={ref} className="fixed inset-0" style={{zIndex:-1}}/>}
+function ClickSpark(){const ref=useRef();useEffect(()=>{const c=ref.current,x=c.getContext('2d');let S=[],raf;const fit=()=>{c.width=innerWidth;c.height=innerHeight};fit();addEventListener('resize',fit);
+  const click=e=>{for(let i=0;i<9;i++)S.push({x:e.clientX,y:e.clientY,a:i*.7,t:0})};addEventListener('click',click);
+  const loop=()=>{x.clearRect(0,0,c.width,c.height);S=S.filter(s=>s.t<1);S.forEach(s=>{s.t+=.05;const d=s.t*22,e=1-s.t;x.strokeStyle=`rgba(255,120,110,${e})`;x.lineWidth=2;x.beginPath();x.moveTo(s.x+Math.cos(s.a)*d,s.y+Math.sin(s.a)*d);x.lineTo(s.x+Math.cos(s.a)*(d+8*e),s.y+Math.sin(s.a)*(d+8*e));x.stroke()});raf=requestAnimationFrame(loop)};loop();
+  return()=>{removeEventListener('click',click);cancelAnimationFrame(raf)}},[]);return <canvas ref={ref} className="fixed inset-0 pointer-events-none" style={{zIndex:80}}/>}
+function CountUp({to}){const [v,setV]=useState(0),p=useRef(0);useEffect(()=>{const from=p.current,t0=performance.now();let r;const f=t=>{const k=Math.min((t-t0)/700,1);setV(Math.round(from+(to-from)*(1-Math.pow(1-k,3))));if(k<1)r=requestAnimationFrame(f);else p.current=to};r=requestAnimationFrame(f);return()=>cancelAnimationFrame(r)},[to]);return <>{v.toLocaleString('en-IN')}</>}
+const BlurText=({text})=><span>{text.split(' ').map((w,i)=><span key={i} className="blurin" style={{animationDelay:i*55+'ms'}}>{w}&nbsp;</span>)}</span>;
+function Spot({children,className='',style}){const r=useRef();return <div ref={r} className={className} style={{...style,position:'relative',overflow:'hidden'}} onMouseMove={e=>{const b=r.current.getBoundingClientRect();r.current.style.setProperty('--mx',e.clientX-b.left+'px');r.current.style.setProperty('--my',e.clientY-b.top+'px')}}>
+  <div className="absolute inset-0 pointer-events-none" style={{background:'radial-gradient(190px circle at var(--mx,-999px) var(--my,-999px),var(--spot),transparent 70%)'}}/>{children}</div>}
+function useLive(on){const cb=useRef();cb.current=on;const seen=useRef(0),[s,setS]=useState({n:0,feed:[],spark:[],live:false});
+  useEffect(()=>{const id=setInterval(async()=>{try{const d=await api('/api/live?since='+seen.current),first=seen.current===0;seen.current=d.n;
+    setS(p=>({n:d.n,live:d.live,feed:[...p.feed,...d.txs].slice(-30),spark:[...p.spark,first?0:d.txs.length].slice(-30)}));cb.current&&cb.current(d)}catch(e){}},1200);return()=>clearInterval(id)},[]);
+  return{...s,toggle:()=>post('/api/live/toggle',''),inject:k=>post('/api/live/inject',k)}}
+function LivePanel({L}){const mx=Math.max(1,...L.spark);
+  return <Spot className="m-3 rounded-lg p-3" style={{background:'var(--card)',border:'1px solid var(--rule)'}}>
+    <div className="flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-semibold"><i className="w-2 h-2 rounded-full" style={{background:L.live?'#e5484d':'var(--mut)',boxShadow:L.live?'0 0 0 4px #e5484d33':'none'}}/>{L.live?<span className="shiny">Live analysis</span>:'Live analysis paused'}</span>
+      <button onClick={L.toggle} className="text-xs underline underline-offset-4">{L.live?'Pause':'Go live'}</button></div>
+    <div className="flex gap-4 mt-2 items-end"><div><div className="cn text-xl font-bold"><CountUp to={L.n}/></div><div className="text-[11px] mut">transactions scored</div></div>
+      <svg viewBox="0 0 90 26" className="flex-1 h-7"><polyline fill="none" stroke="var(--acc)" strokeWidth="1.6" points={L.spark.map((v,i)=>`${i*3},${25-v/mx*22}`).join(' ')}/></svg></div>
+    <div className="mt-2 h-20 overflow-hidden text-[11.5px] cn space-y-0.5">{L.feed.slice(-5).reverse().map(t=><div key={t.id} className="blurin" style={{color:t.hot?'#e5484d':'var(--mut)',fontWeight:t.hot?700:400}}>{t.src}→{t.dst} {inr(t.amt)}</div>)}</div>
+    <div className="flex gap-2 mt-2 flex-wrap items-center"><span className="text-[11px] mut">Simulate an attack:</span>{[['ring','Laundering ring'],['structuring','Structuring']].map(([k,l])=><button key={k} onClick={()=>L.inject(k)} className="text-xs px-2 py-1 rounded transition hover:opacity-70" style={{border:'1px solid var(--ink)'}}>{l}</button>)}</div></Spot>}
+
+function Palette({items,onClose}){const [q,setQ]=useState(''),[i,setI]=useState(0);const f=items.filter(x=>x.l.toLowerCase().includes(q.toLowerCase()));
+  useEffect(()=>setI(0),[q]);
+  const key=e=>{if(e.key==='Escape')onClose();if(e.key==='ArrowDown'){e.preventDefault();setI(k=>Math.min(k+1,f.length-1))}if(e.key==='ArrowUp'){e.preventDefault();setI(k=>Math.max(k-1,0))}if(e.key==='Enter'&&f[i]){f[i].run();onClose()}};
+  return <div className="fixed inset-0 z-[70] flex justify-center pt-[14vh]" style={{background:'#00000088'}} onClick={onClose}>
+    <div className="slide w-[min(560px,92%)] h-fit rounded-xl overflow-hidden" style={{background:'var(--card)',border:'1px solid var(--rule)',backdropFilter:'blur(16px)'}} onClick={e=>e.stopPropagation()}>
+      <input autoFocus value={q} onChange={e=>setQ(e.target.value)} onKeyDown={key} placeholder="Jump to a case or run an action…" className="w-full px-5 py-4 bg-transparent outline-none" style={{borderBottom:'1px solid var(--rule)',color:'var(--ink)'}}/>
+      <div className="max-h-72 overflow-y-auto py-1">{f.map((x,k)=><button key={x.l} onClick={()=>{x.run();onClose()}} onMouseEnter={()=>setI(k)} className="w-full text-left px-5 py-2.5 text-sm flex justify-between" style={{background:k===i?'var(--spot)':'transparent'}}><span>{x.l}</span><span className="mut text-xs">{x.h}</span></button>)}{!f.length&&<p className="px-5 py-3 text-sm mut">No matches.</p>}</div></div></div>}
+function App(){
+  const [list,setList]=useState([]),[sum,setSum]=useState(null),[sel,setSel]=useState(null),[d,setD]=useState(null),[pred,setPred]=useState(null),
+    [sar,setSar]=useState(null),[busy,setBusy]=useState(''),[q,setQ]=useState('All'),[tab,setTab]=useState('Evidence'),[toast,setToast]=useState('');
+  const say=m=>{setToast(m);setTimeout(()=>setToast(''),2200)};
+  const load=()=>api('/api/alerts').then(setList);
+  const pick=i=>{setSel(i);setPred(null);setD(null);setTab('Evidence');api('/api/alerts/'+i).then(setD)};
+  const refresh=async()=>setD(await api('/api/alerts/'+sel));
+  useEffect(()=>{load();api('/api/summary').then(setSum)},[]);
+  useEffect(()=>{if(list.length&&!sel)pick(list[0].id)},[list]);
+  const shown=list.filter(a=>q==='All'||a.risk===q.toUpperCase());
+  useEffect(()=>{const k=e=>{if(/SELECT|INPUT/.test(e.target.tagName))return;const i=shown.findIndex(a=>a.id===sel);if(e.key==='j'&&shown[i+1])pick(shown[i+1].id);if(e.key==='k'&&shown[i-1])pick(shown[i-1].id)};window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k)});
+  const run=async(k,fn)=>{setBusy(k);await fn();setBusy('')};
+  const E=sum&&sum.eval;
+  const [theme,setTheme]=useState(localStorage.getItem('st')||'ledger');
+  const cycle=()=>setTheme(t=>{const o=Object.keys(THEMES);return o[(o.indexOf(t)+1)%o.length]});
+  useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('st',theme)},[theme]);
+  useEffect(()=>{const k=e=>{if(e.key==='t'&&!/SELECT|INPUT/.test(e.target.tagName))setTheme(t=>{const o=Object.keys(THEMES);return o[(o.indexOf(t)+1)%o.length]})};addEventListener('keydown',k);return()=>removeEventListener('keydown',k)},[]);
+  const same=(p,n)=>JSON.stringify(p)===JSON.stringify(n)?p:n;
+  const L=useLive(x=>{setList(p=>same(p,x.alerts));setSum(p=>same(p,x.summary));x.events.forEach(e=>say(`New ${e.risk.toLowerCase()}-risk alert ${e.id} caught live`))});
+  useEffect(()=>{const a=list.find(x=>x.id===sel);if(a&&d&&d.id===sel&&(a.risk!==d.risk||a.total!==d.total||a.accounts.length!==d.accounts.length))refresh()},[list]);
+  const [pal,setPal]=useState(false),[auto,setAuto]=useState(false),[waking,setWaking]=useState(false);
+  useEffect(()=>{const t=setTimeout(()=>setWaking(true),2500);const k=e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();setPal(p=>!p)}};addEventListener('keydown',k);return()=>{clearTimeout(t);removeEventListener('keydown',k)}},[]);
+  const demo=async()=>{const top=list[0];if(auto||!top)return;setAuto(true);const w=ms=>new Promise(r=>setTimeout(r,ms));
+    pick(top.id);await w(1800);dispatchEvent(new Event('sentinel:replay'));await w(4600);
+    setPred(await api(`/api/alerts/${top.id}/predict`));say('Autopilot: where will the money go next?');await w(2800);
+    setTab('Timeline');await w(2400);setTab('Evidence');setSar(await api(`/api/alerts/${top.id}/sar`));await w(5000);setSar(null);setAuto(false)};
+  const items=[...list.map(a=>({l:`Open ${a.id} · ${a.risk.toLowerCase()} risk`,h:'case',run:()=>pick(a.id)})),{l:'Change theme',h:'t',run:cycle},{l:L.live?'Pause live analysis':'Go live',h:'live',run:L.toggle},
+    {l:'Simulate a laundering ring',h:'attack',run:()=>L.inject('ring')},{l:'Simulate structuring',h:'attack',run:()=>L.inject('structuring')},{l:'Run the autopilot demo',h:'demo',run:demo},{l:'Print case file / save PDF',h:'pdf',run:()=>window.print()}];
+  return <div className="h-screen flex flex-col"><Bg/><ClickSpark/>
+    <header className="px-6 py-4 flex flex-wrap items-end gap-x-8 gap-y-2 shrink-0" style={{borderBottom:'1px solid var(--rule)'}}>
+      <div className="flex items-center gap-4"><div className="flex items-baseline gap-3"><h1 className="serif text-2xl font-semibold shiny">Sentinel</h1><span className="text-sm mut">investigations desk</span></div>
+      <button onClick={cycle} title="Change theme (t)" className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full transition hover:opacity-75" style={{border:'1px solid var(--rule)',background:'var(--card)'}}><i className="w-3.5 h-3.5 rounded-full" style={{background:`linear-gradient(135deg,${SW[theme][0]} 50%,${SW[theme][1]} 50%)`,boxShadow:'0 0 0 1px var(--rule)'}}/>{THEMES[theme]}</button>
+      <button onClick={demo} disabled={auto} className="text-xs px-3 py-1.5 rounded-full transition hover:opacity-75 disabled:opacity-60" style={{background:'var(--ink)',color:'var(--paper)'}}>{auto?'Autopilot running…':'▶ Autopilot demo'}</button>
+      <button onClick={()=>setPal(true)} className="hidden md:block text-xs px-2.5 py-1.5 rounded-full" style={{border:'1px solid var(--rule)'}}><kbd>Ctrl</kbd> <kbd>K</kbd></button></div>
+      {E&&<div className="ml-auto hidden md:flex gap-2.5">{[['Open alerts',list.filter(a=>!['CLOSED','AUTO_TRIAGED'].includes(a.status)).length,''],['High risk',list.filter(a=>a.risk==='HIGH').length,''],['Flagged flow, ₹ lakh',Math.round(list.reduce((t,a)=>t+(a.risk==='LOW'?0:a.total),0)/1e5),''],['Precision, test set',Math.round(E.precision*100),'%'],['Closed by agent',E.auto_triaged,'']].map(([k,v,u])=>
+        <Spot key={k} className="rounded-lg px-3.5 py-2 min-w-[92px]" style={{background:'var(--card)',border:'1px solid var(--rule)'}}><div className="cn text-xl font-bold leading-none"><CountUp to={v}/>{u}</div><div className="text-[11px] mut mt-1 whitespace-nowrap">{k}</div></Spot>)}</div>}
+    </header>
+    <div className="flex flex-1 min-h-0 flex-col lg:flex-row">
+      <aside className="lg:w-80 lg:border-r overflow-y-auto shrink-0 max-h-52 lg:max-h-none" style={{borderColor:'var(--rule)'}}>
+        <LivePanel L={L}/><div className="flex gap-4 px-4 pt-4 pb-2 text-sm">{['All','High','Medium','Low'].map(k=><button key={k} onClick={()=>setQ(k)} className="pb-1 transition" style={{fontWeight:q===k?600:400,color:q===k?'var(--ink)':'var(--mut)',boxShadow:q===k?'0 2px 0 var(--ink)':'none'}}>{k}</button>)}</div>
+        {shown.map(a=><button key={a.id} onClick={()=>pick(a.id)} className="w-full text-left px-4 py-3.5 transition hover:bg-white/50" style={{borderBottom:'1px solid var(--rule)',background:sel===a.id?'var(--card)':'transparent',boxShadow:sel===a.id?'inset 3px 0 0 var(--ink)':'none'}}>
+          <div className="flex justify-between items-baseline"><span className="cn font-bold">{a.id}</span><span className="text-xs font-semibold" style={{color:RK[a.risk]}}>{a.risk.toLowerCase()} risk</span></div>
+          <p className="serif text-[14.5px] mt-1 leading-snug line-clamp-2">{a.explanation}</p>
+          <div className="flex justify-between text-xs mt-1.5 mut"><span>{a.kinds.map(k=>KN[k].toLowerCase()).join(', ')}</span><span className="whitespace-nowrap ml-2">{a.status==='AUTO_TRIAGED'?'closed by agent':a.total?lakh(a.total):a.status.toLowerCase()}</span></div></button>)}
+        {!shown.length&&<p className="text-sm mut p-4">Nothing at this level right now.</p>}
+        <p className="text-xs mut p-4 hidden lg:block leading-loose"><kbd>j</kbd> <kbd>k</kbd> cases · <kbd>t</kbd> theme · <kbd>Ctrl</kbd> <kbd>K</kbd> search</p>
+      </aside>
+      <main className="flex-1 relative min-w-0 min-h-[50vh]" style={{background:'var(--stage)'}}>{d&&d.id===sel?<Graph alert={d} pred={pred}/>:<p className="p-8 text-sm" style={{color:'#8fa398'}}>Pulling the case file…</p>}</main>
+      <aside className="lg:w-[26rem] lg:border-l overflow-y-auto shrink-0" style={{borderColor:'var(--rule)',background:'var(--card)'}}>{d?<div className="p-6 print-area" key={d.id}>
+        <div className="flex items-start justify-between"><div><p className="text-xs mut">Case file</p><h2 className="cn text-xl font-bold">{d.id}</h2></div><span className="stamp" style={{color:RK[d.risk]}}>{d.risk}</span></div>
+        <p className="serif text-[16px] leading-relaxed mt-4"><BlurText key={d.id+d.explanation} text={d.explanation}/></p>
+        <p className="text-sm mut mt-2">{d.total?`${lakh(d.total)} flagged across ${d.accounts.length} accounts.`:`${d.accounts.length} account under review.`}</p>
+        <div className="flex flex-wrap items-center gap-2 mt-5">
+          <Btn v="solid" busy={busy==='s'} onClick={()=>run('s',async()=>{setSar(await api(`/api/alerts/${d.id}/sar`));await refresh()})}>Draft SAR</Btn>
+          <Btn busy={busy==='p'} onClick={()=>run('p',async()=>{setPred(await api(`/api/alerts/${d.id}/predict`));await refresh();say('Guesses for the next hop are on the graph')})}>Where next?</Btn>
+          <Btn v="link" onClick={()=>{window.open(`/api/alerts/${d.id}/export`);say('Evidence bundle downloaded')}}>Export evidence</Btn><Btn v="link" onClick={()=>window.print()}>Print / PDF</Btn></div>
+        <div className="flex gap-5 mt-6" style={{borderBottom:'1px solid var(--rule)'}}>{['Evidence','Timeline','Case'].map(t=><button key={t} onClick={()=>setTab(t)} className="pb-2 text-sm transition" style={{fontWeight:tab===t?600:400,color:tab===t?'var(--ink)':'var(--mut)',boxShadow:tab===t?'0 2px 0 var(--ink)':'none'}}>{t}</button>)}</div>
+        <div className="mt-2">
+        {tab==='Evidence'&&<>
+          {pred&&<div className="my-3 p-3.5 rounded text-sm" style={{background:'rgba(217,138,18,.18)',borderLeft:'3px solid #d98a12'}}>
+            <p className="font-semibold">If the money keeps moving from {pred.tail}, the model’s top guesses are:</p>
+            {pred.candidates.map(c=><p key={c.id} className="mt-1"><span className="cn font-bold">{c.id}</span> <span className="mut">{Math.round(c.prob*100)}% · {c.why}</span></p>)}
+            <p className="text-xs mut mt-2">A prediction, not an observation.</p></div>}
+          {d.evidence.map((e,i)=><div key={i} className="py-3.5" style={{borderBottom:'1px solid var(--rule)'}}>
+            <p className="text-xs font-semibold" style={{color:RK[d.risk]}}>{KN[kindOf(e)]}</p><p className="serif text-[15px] leading-relaxed mt-1">{e}</p></div>)}</>}
+        {tab==='Timeline'&&<ol className="mt-4 ml-1.5 pl-5 space-y-4" style={{borderLeft:'1px solid var(--rule)'}}>{d.timeline.map((t,i)=><li key={i} className="relative">
+          <i className="absolute -left-[26px] top-1 w-2 h-2 rounded-full" style={{background:t.kind==='emp'?'#3f4bb8':'#c62828'}}/><p className="cn text-[13px]" style={{color:t.kind==='emp'?'#3f4bb8':'var(--ink)'}}>{t.text}</p></li>)}</ol>}
+        {tab==='Case'&&<div className="mt-4">
+          <div className="flex gap-2"><select value={d.assignee||''} onChange={async e=>{setD(await post(`/api/alerts/${d.id}/assign`,e.target.value));load();say('Assigned to '+e.target.value)}} className="flex-1 rounded text-sm px-3 py-2" style={{background:'var(--card)',color:'var(--ink)',border:'1px solid var(--rule)'}}>
+            <option value="">Assign to…</option>{['A. Rao','P. Iyer','S. Khan'].map(n=><option key={n}>{n}</option>)}</select>
+            <Btn onClick={async()=>{setD(await post(`/api/alerts/${d.id}/status`,'CLOSED'));load();say('Case closed')}}>Close case</Btn></div>
+          <p className="text-xs mut mt-5 mb-1">Audit trail</p>
+          {d.audit.map((a,i)=><p key={i} className="text-sm py-2.5 leading-snug" style={{borderBottom:'1px solid var(--rule)'}}><b className="cn text-[13px]">{a.by}</b><br/><span className={a.by.includes('agent')?'serif italic':''}>{a.note}</span></p>)}</div>}
+        </div></div>:<p className="p-6 text-sm mut">Pulling the case file…</p>}</aside>
+    </div>
+    {pal&&<Palette items={items} onClose={()=>setPal(false)}/>}
+    {!list.length&&waking&&<div className="fixed inset-0 z-[65] flex items-center justify-center text-center p-8" style={{background:'var(--paper)'}}><div><h2 className="serif text-4xl font-semibold shiny">Sentinel</h2><p className="mut mt-3 max-w-sm">Waking the analysis engine. Free servers sleep when idle, so the first load can take up to a minute.</p></div></div>}
+    {sar&&<Sar sar={sar} onClose={()=>setSar(null)}/>}
+    {toast&&<div className="fixed bottom-5 left-5 z-[60] rounded px-4 py-2.5 text-sm slide" style={{background:'var(--ink)',color:'var(--paper)'}}>{toast}</div>}
+  </div>}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script></body></html>
