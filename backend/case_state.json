@@ -1,0 +1,378 @@
+{
+  "ALR-001": {
+    "status": "ESCALATED",
+    "assignee": "P. Iyer",
+    "disposition": "ESCALATED",
+    "reviewer_notes": [
+      {
+        "ts": "2026-09-29T10:50:36.430738",
+        "by": "analyst",
+        "note": "This looks like a real case \u2014 escalate."
+      },
+      {
+        "ts": "2026-09-29T10:57:04.991539",
+        "by": "test-runner",
+        "note": "Test note from API check"
+      },
+      {
+        "ts": "2026-09-29T11:43:44.678981",
+        "by": "P. Iyer",
+        "note": "Investigated insider transaction sequence on AC1050."
+      },
+      {
+        "ts": "2026-09-29T11:44:49.513700",
+        "by": "P. Iyer",
+        "note": "Investigated insider transaction sequence on AC1050."
+      },
+      {
+        "ts": "2026-09-29T11:46:08.376855",
+        "by": "P. Iyer",
+        "note": "Investigated insider transaction sequence on AC1050."
+      }
+    ],
+    "audit": [
+      {
+        "ts": "2026-09-21T09:00:00",
+        "by": "correlation-engine",
+        "note": "Alert created: ACCESS_CHAIN, CIRCULAR_TRANSFER, PROFILE_MISMATCH, UNAUTHORIZED_ACCESS"
+      },
+      {
+        "ts": "2026-09-29T10:50:36.430738",
+        "by": "test",
+        "note": "Assigned to A. Rao"
+      },
+      {
+        "ts": "2026-09-29T10:50:36.430738",
+        "by": "analyst",
+        "note": "Note added: This looks like a real case \u2014 escalate."
+      },
+      {
+        "ts": "2026-09-29T10:50:36.430738",
+        "by": "analyst",
+        "note": "Disposition set to CONFIRMED_SUSPICIOUS"
+      },
+      {
+        "ts": "2026-09-29T10:50:36.431281",
+        "by": "analyst",
+        "note": "Escalated to FIU"
+      },
+      {
+        "ts": "2026-09-29T10:51:30.411146",
+        "by": "next-hop-model",
+        "note": "Predicted next targets from AC1050"
+      },
+      {
+        "ts": "2026-09-29T10:56:58.889494",
+        "by": "analyst",
+        "note": "Assigned to P. Iyer"
+      },
+      {
+        "ts": "2026-09-29T10:57:00.926638",
+        "by": "analyst",
+        "note": "Status changed ASSIGNED \u2192 UNDER_REVIEW"
+      },
+      {
+        "ts": "2026-09-29T10:57:02.943666",
+        "by": "analyst",
+        "note": "Disposition set to CONFIRMED_SUSPICIOUS"
+      },
+      {
+        "ts": "2026-09-29T10:57:04.991539",
+        "by": "test-runner",
+        "note": "Note added: Test note from API check"
+      },
+      {
+        "ts": "2026-09-29T10:57:07.022681",
+        "by": "analyst",
+        "note": "Escalated: Critical pattern"
+      },
+      {
+        "ts": "2026-09-29T11:43:34.442109",
+        "by": "next-hop-model",
+        "note": "Predicted next targets from AC1050"
+      },
+      {
+        "ts": "2026-09-29T11:43:36.499999",
+        "by": "template-fallback",
+        "note": "SAR narrative generated"
+      },
+      {
+        "ts": "2026-09-29T11:43:38.560093",
+        "by": "analyst",
+        "note": "Assigned to P. Iyer"
+      },
+      {
+        "ts": "2026-09-29T11:43:40.604481",
+        "by": "analyst",
+        "note": "Status changed ASSIGNED \u2192 UNDER_REVIEW"
+      },
+      {
+        "ts": "2026-09-29T11:43:42.660249",
+        "by": "analyst",
+        "note": "Disposition set to CONFIRMED_SUSPICIOUS"
+      },
+      {
+        "ts": "2026-09-29T11:43:44.678981",
+        "by": "P. Iyer",
+        "note": "Note added: Investigated insider transaction sequence on AC1050."
+      },
+      {
+        "ts": "2026-09-29T11:43:46.711429",
+        "by": "analyst",
+        "note": "Escalated: Regulatory filing recommendation"
+      },
+      {
+        "ts": "2026-09-29T11:44:39.223548",
+        "by": "next-hop-model",
+        "note": "Predicted next targets from AC1050"
+      },
+      {
+        "ts": "2026-09-29T11:44:41.286643",
+        "by": "template-fallback",
+        "note": "SAR narrative generated"
+      },
+      {
+        "ts": "2026-09-29T11:44:43.338627",
+        "by": "analyst",
+        "note": "Assigned to P. Iyer"
+      },
+      {
+        "ts": "2026-09-29T11:44:45.405742",
+        "by": "analyst",
+        "note": "Status changed ASSIGNED \u2192 UNDER_REVIEW"
+      },
+      {
+        "ts": "2026-09-29T11:44:47.457704",
+        "by": "analyst",
+        "note": "Disposition set to CONFIRMED_SUSPICIOUS"
+      },
+      {
+        "ts": "2026-09-29T11:44:49.513700",
+        "by": "P. Iyer",
+        "note": "Note added: Investigated insider transaction sequence on AC1050."
+      },
+      {
+        "ts": "2026-09-29T11:44:51.575904",
+        "by": "analyst",
+        "note": "Escalated: Regulatory filing recommendation"
+      },
+      {
+        "ts": "2026-09-29T11:45:57.708798",
+        "by": "next-hop-model",
+        "note": "Predicted next targets from AC1050"
+      },
+      {
+        "ts": "2026-09-29T11:45:59.756584",
+        "by": "template-fallback",
+        "note": "SAR narrative generated"
+      },
+      {
+        "ts": "2026-09-29T11:46:01.799419",
+        "by": "analyst",
+        "note": "Assigned to P. Iyer"
+      },
+      {
+        "ts": "2026-09-29T11:46:04.254283",
+        "by": "analyst",
+        "note": "Status changed ASSIGNED \u2192 UNDER_REVIEW"
+      },
+      {
+        "ts": "2026-09-29T11:46:06.330137",
+        "by": "analyst",
+        "note": "Disposition set to CONFIRMED_SUSPICIOUS"
+      },
+      {
+        "ts": "2026-09-29T11:46:08.376855",
+        "by": "P. Iyer",
+        "note": "Note added: Investigated insider transaction sequence on AC1050."
+      },
+      {
+        "ts": "2026-09-29T11:46:10.420997",
+        "by": "analyst",
+        "note": "Escalated: Regulatory filing recommendation"
+      },
+      {
+        "ts": "2026-09-29T12:07:07.076493",
+        "by": "analyst",
+        "note": "Escalated"
+      },
+      {
+        "ts": "2026-09-29T12:07:08.628041",
+        "by": "analyst",
+        "note": "Escalated"
+      },
+      {
+        "ts": "2026-09-29T12:07:26.525751",
+        "by": "next-hop-model",
+        "note": "Predicted next targets from AC1050"
+      },
+      {
+        "ts": "2026-09-29T12:07:31.743657",
+        "by": "template-fallback",
+        "note": "SAR narrative generated"
+      },
+      {
+        "ts": "2026-09-29T13:31:41.535947",
+        "by": "next-hop-model",
+        "note": "Predicted next targets from AC1050"
+      },
+      {
+        "ts": "2026-09-29T13:39:29.921554",
+        "by": "analyst",
+        "note": "Escalated"
+      },
+      {
+        "ts": "2026-09-29T13:40:01.923803",
+        "by": "analyst",
+        "note": "Escalated"
+      },
+      {
+        "ts": "2026-09-29T13:45:36.924608",
+        "by": "next-hop-model",
+        "note": "Predicted next targets from AC1050"
+      },
+      {
+        "ts": "2026-09-29T13:45:54.795108",
+        "by": "next-hop-model",
+        "note": "Predicted next targets from AC1050"
+      },
+      {
+        "ts": "2026-09-29T13:45:55.655530",
+        "by": "next-hop-model",
+        "note": "Predicted next targets from AC1050"
+      },
+      {
+        "ts": "2026-09-29T13:45:56.544224",
+        "by": "template-fallback",
+        "note": "SAR narrative generated"
+      }
+    ]
+  },
+  "ALR-009": {
+    "status": "OPEN",
+    "assignee": null,
+    "disposition": "NONE",
+    "reviewer_notes": [],
+    "audit": [
+      {
+        "ts": "2026-09-28T11:29:00",
+        "by": "correlation-engine",
+        "note": "Detected live: INSIDER_LINK, PROFILE_MISMATCH, UNAUTHORIZED_ACCESS"
+      }
+    ]
+  },
+  "ALR-002": {
+    "status": "OPEN",
+    "assignee": null,
+    "disposition": "NONE",
+    "reviewer_notes": [],
+    "audit": [
+      {
+        "ts": "2026-09-21T09:00:00",
+        "by": "correlation-engine",
+        "note": "Alert created: PROFILE_MISMATCH, STRUCTURING"
+      }
+    ]
+  },
+  "ALR-003": {
+    "status": "OPEN",
+    "assignee": null,
+    "disposition": "NONE",
+    "reviewer_notes": [],
+    "audit": [
+      {
+        "ts": "2026-09-21T09:00:00",
+        "by": "correlation-engine",
+        "note": "Alert created: PROFILE_MISMATCH"
+      },
+      {
+        "ts": "2026-09-28T11:38:00",
+        "by": "correlation-engine",
+        "note": "Risk changed LOW \u2192 MEDIUM as new activity arrived"
+      }
+    ]
+  },
+  "ALR-010": {
+    "status": "OPEN",
+    "assignee": null,
+    "disposition": "NONE",
+    "reviewer_notes": [],
+    "audit": [
+      {
+        "ts": "2026-09-28T11:29:00",
+        "by": "correlation-engine",
+        "note": "Detected live: PROFILE_MISMATCH"
+      }
+    ]
+  },
+  "ALR-013": {
+    "status": "OPEN",
+    "assignee": null,
+    "disposition": "NONE",
+    "reviewer_notes": [],
+    "audit": [
+      {
+        "ts": "2026-09-28T11:38:00",
+        "by": "correlation-engine",
+        "note": "Detected live: PROFILE_MISMATCH"
+      }
+    ]
+  },
+  "ALR-004": {
+    "status": "OPEN",
+    "assignee": null,
+    "disposition": "NONE",
+    "reviewer_notes": [],
+    "audit": [
+      {
+        "ts": "2026-09-21T09:00:00",
+        "by": "correlation-engine",
+        "note": "Alert created: PROFILE_MISMATCH"
+      }
+    ]
+  },
+  "ALR-011": {
+    "status": "OPEN",
+    "assignee": null,
+    "disposition": "NONE",
+    "reviewer_notes": [],
+    "audit": [
+      {
+        "ts": "2026-09-28T11:29:00",
+        "by": "correlation-engine",
+        "note": "Detected live: PROFILE_MISMATCH"
+      }
+    ]
+  },
+  "ALR-014": {
+    "status": "OPEN",
+    "assignee": null,
+    "disposition": "NONE",
+    "reviewer_notes": [],
+    "audit": [
+      {
+        "ts": "2026-09-28T12:13:00",
+        "by": "correlation-engine",
+        "note": "Detected live: PROFILE_MISMATCH"
+      }
+    ]
+  },
+  "ALR-008": {
+    "status": "AUTO_TRIAGED",
+    "assignee": null,
+    "disposition": "NONE",
+    "reviewer_notes": [],
+    "audit": [
+      {
+        "ts": "2026-09-21T09:00:00",
+        "by": "correlation-engine",
+        "note": "Alert created: PROFILE_MISMATCH"
+      },
+      {
+        "ts": "2026-09-29T09:00:00",
+        "by": "triage-agent",
+        "note": "Auto-triaged: consistent with routine payroll behavior (12 payees, identical payouts across repeated cycles, no linked insider activity)."
+      }
+    ]
+  }
+}

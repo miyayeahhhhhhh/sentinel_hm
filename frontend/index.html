@@ -18,12 +18,11 @@ kbd{font-family:'Courier Prime',monospace;font-size:11px;padding:1px 5px;border-
 .shiny{background:linear-gradient(110deg,var(--ink) 35%,var(--acc) 50%,var(--ink) 65%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 3.4s linear infinite}
 @keyframes shine{from{background-position:120% 0}to{background-position:-120% 0}}
 .blurin{display:inline-block;animation:bl .6s both}@keyframes bl{from{filter:blur(8px);opacity:0;transform:translateY(8px)}to{filter:blur(0);opacity:1;transform:none}}
-
 body{background:var(--paper);color:var(--ink);font-family:'Instrument Sans',system-ui,sans-serif;overflow:hidden}
 .serif{font-family:'Source Serif 4',Georgia,serif}.cn{font-family:'Courier Prime',monospace}.mut{color:var(--mut)}
 .stamp{display:inline-block;border:2px solid;outline:1px solid;outline-offset:2px;padding:1px 10px;border-radius:3px;transform:rotate(-4deg);font:700 13px 'Courier Prime',monospace;letter-spacing:.14em;opacity:.92}
 ::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:#b3bfb6;border-radius:9px}
-button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #3f4bb8;outline-offset:2px}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #3f4bb8;outline-offset:2px}
 @keyframes slide{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}.slide{animation:slide .2s ease-out}
 input[type=range]{accent-color:#e5484d}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -32,17 +31,25 @@ input[type=range]{accent-color:#e5484d}
 <script type="text/babel">
 const {useState,useEffect,useMemo,useRef}=React;
 const RK={HIGH:'#e5484d',MEDIUM:'#d98a12',LOW:'#4a9cc9'};
-const KN={CIRCULAR_TRANSFER:'Circular flow',STRUCTURING:'Structuring',PROFILE_MISMATCH:'Profile mismatch',INSIDER_LINK:'Insider link'};
-const kindOf=t=>/loop/.test(t)?'CIRCULAR_TRANSFER':/threshold/.test(t)?'STRUCTURING':/isolated/.test(t)?'PROFILE_MISMATCH':'INSIDER_LINK';
+const DK={NONE:'var(--mut)',CONFIRMED_SUSPICIOUS:'#e5484d',FALSE_POSITIVE:'#4a9cc9',BENIGN_LEGITIMATE:'#3a9e6e',ESCALATED:'#c07a00'};
+const KN={CIRCULAR_TRANSFER:'Circular flow',STRUCTURING:'Structuring',PROFILE_MISMATCH:'Profile mismatch',INSIDER_LINK:'Insider link',ACCESS_CHAIN:'Access chain',UNAUTHORIZED_ACCESS:'Unauthorized access',OFF_HOURS_ACCESS:'Off-hours access'};
+const kindOf=e=>{if(typeof e==='object'&&e.kind)return e.kind;if(typeof e==='string'){if(/loop/.test(e))return'CIRCULAR_TRANSFER';if(/threshold/.test(e))return'STRUCTURING';if(/isolated/.test(e))return'PROFILE_MISMATCH';return'INSIDER_LINK'}return'UNKNOWN'};
 const inr=n=>'₹'+Number(n).toLocaleString('en-IN');
 const lakh=n=>n>=1e5?'₹'+(n/1e5).toFixed(1)+' lakh':inr(n);
-const headline=a=>a.kinds.includes('CIRCULAR_TRANSFER')?`${a.accounts.length} accounts passed ${lakh(a.total)} around in a loop`:a.kinds.includes('STRUCTURING')?'Payments split to stay under the ₹2 lakh limit':'One account acting unlike its profile';
+const pct=v=>Math.round(v*100)+'%';
+const headline=a=>a.narrative||
+  (a.kinds.includes('CIRCULAR_TRANSFER')?`${a.accounts.length} accounts passed ${lakh(a.total)} around in a loop`:
+   a.kinds.includes('STRUCTURING')?'Payments split to stay under the reporting threshold':
+   a.kinds.includes('ACCESS_CHAIN')||a.kinds.includes('UNAUTHORIZED_ACCESS')?'Insider access pattern detected':
+   'One account acting unlike its profile');
 const api=(u,o)=>fetch(u,o).then(r=>r.json());
 const post=(u,v)=>api(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:v})});
-const Btn=({children,onClick,v='line',busy})=>{const s={solid:{background:'var(--ink)',color:'var(--paper)'},line:{border:'1px solid var(--ink)'},link:{textDecoration:'underline',textUnderlineOffset:3}}[v];
-  return <button onClick={onClick} disabled={busy} className="px-3.5 py-2 rounded text-sm font-medium transition hover:opacity-80 disabled:opacity-50" style={s}>{busy?'One moment…':children}</button>};
+const postJ=(u,b)=>api(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+const Btn=({children,onClick,v='line',busy,id})=>{const s={solid:{background:'var(--ink)',color:'var(--paper)'},line:{border:'1px solid var(--ink)'},link:{textDecoration:'underline',textUnderlineOffset:3},danger:{background:'#e5484d',color:'#fff'}}[v];
+  return <button id={id} onClick={onClick} disabled={busy} className="px-3.5 py-2 rounded text-sm font-medium transition hover:opacity-80 disabled:opacity-50" style={s}>{busy?'One moment…':children}</button>};
 const Ghost=({children,onClick})=><button onClick={onClick} className="px-2.5 py-1 rounded text-xs transition hover:bg-white/10" style={{border:'1px solid #3a4b42',color:'#cfdad2'}}>{children}</button>;
 
+/* ── Graph ── */
 function Graph({alert,pred}){
   const box=useRef(),fg=useRef(),[sz,setSz]=useState({w:600,h:500}),[hov,setHov]=useState(null),[mp,setMp]=useState({x:0,y:0}),[ctx,setCtx]=useState(true),[playing,setPlaying]=useState(false);
   const max=alert.links.filter(l=>l.bad).length,[step,setStep]=useState(max);
@@ -62,7 +69,7 @@ function Graph({alert,pred}){
     <ForceGraph2D ref={fg} width={sz.w} height={sz.h} graphData={data} backgroundColor="rgba(0,0,0,0)" cooldownTicks={140} d3VelocityDecay={.3}
       onNodeHover={n=>setHov(n||null)} nodeVisibility={n=>ctx||n.bad||n.kind==='emp'||!!n.pred}
       linkVisibility={l=>l.bad?l._i<step:(ctx||l.kind==='emp'||l.pred)}
-      linkColor={l=>{const dim=nb&&!(nb.has(id(l.source))&&nb.has(id(l.target)));const c=l.pred?'#f2b340':l.kind==='emp'?'#9aa3ff':l.bad?'#e5484d':'#3c5147';return dim?c+'40':c}}
+      linkColor={l=>{const dim=nb&&!(nb.has(id(l.source))&&nb.has(id(l.target)));const c=l.pred?'#f2b340':l.kind==='emp'?(l.authorized===false?'#e5484d':'#9aa3ff'):l.bad?'#e5484d':'#3c5147';return dim?c+'40':c}}
       linkWidth={l=>l.bad?2.4:1} linkLineDash={l=>l.pred||l.kind==='emp'?[4,3]:null}
       linkDirectionalArrowLength={l=>l.kind==='emp'?0:6} linkDirectionalArrowRelPos={.92}
       linkDirectionalParticles={l=>l.bad?2:0} linkDirectionalParticleWidth={2.6} linkDirectionalParticleColor={()=>'#ffd9d6'}
@@ -73,7 +80,7 @@ function Graph({alert,pred}){
         if(n.kind==='emp')c.rect(n.x-7,n.y-7,14,14);else c.arc(n.x,n.y,on?7:n.pred?6:4,0,7);c.fill();
         if(on){c.strokeStyle='#f3efe4';c.lineWidth=1.5;c.stroke()}
         if(n.pred){c.setLineDash([3,2]);c.strokeStyle='#f2b340';c.beginPath();c.arc(n.x,n.y,11,0,7);c.stroke()}
-        if(gs>.85||on||n.pred||n.kind==='emp'){c.font=`${Math.max(10/gs,3.4)}px 'Courier Prime'`;c.fillStyle='#cfdad2';c.textAlign='center';c.fillText(n.pred?`${n.id} · ${Math.round(n.pred*100)}%`:n.id,n.x,n.y+17)}
+        if(gs>.85||on||n.pred||n.kind==='emp'){c.font=`${Math.max(10/gs,3.4)}px 'Courier Prime'`;c.fillStyle='#cfdad2';c.textAlign='center';c.fillText(n.pred?`PREDICTED ${n.id} · ${Math.round(n.pred*100)}%`:n.id,n.x,n.y+17)}
         c.restore()}}
       nodePointerAreaPaint={(n,col,c)=>{c.fillStyle=col;c.beginPath();c.arc(n.x,n.y,11,0,7);c.fill()}}/>
     <div className="absolute top-5 left-6 max-w-sm pointer-events-none">
@@ -87,25 +94,69 @@ function Graph({alert,pred}){
       <span className="cn text-xs whitespace-nowrap" style={{color:'#8fa398'}}>transfer {step} of {max}</span>
       <input aria-label="Step through flagged transfers" type="range" min="0" max={max} value={step} onChange={e=>{setPlaying(false);setStep(+e.target.value)}} className="flex-1"/></div>}
     <div className="absolute bottom-5 left-6 text-xs space-y-1" style={{color:'#8fa398'}}>
-      {[['#e5484d','flagged account'],['#7f9488','ordinary account'],['#9aa3ff','bank employee'],['#f2b340','model’s guess for next hop']].map(([c,l])=><div key={l}><i className="inline-block w-2 h-2 mr-2 rounded-full" style={{background:c}}/>{l}</div>)}</div>
+      {[['#e5484d','flagged account / unauthorized link'],['#7f9488','ordinary account'],['#9aa3ff','bank employee (authorized)'],['#f2b340','PREDICTED next hop (model)']].map(([c,l])=><div key={l}><i className="inline-block w-2 h-2 mr-2 rounded-full" style={{background:c}}/>{l}</div>)}</div>
     {hov&&<div className="absolute rounded px-2.5 py-1.5 text-xs pointer-events-none shadow-lg" style={{left:mp.x+14,top:mp.y+14,background:'#f1eee3',color:'var(--ink)'}}>
-      <b className="cn">{hov.id}</b><div className="mut">{hov.kind==='emp'?'Bank employee':hov.pred?`Guess: ${Math.round(hov.pred*100)}% likely next`:`${touch.length} transfers on screen, ${lakh(touch.reduce((s,l)=>s+l.amt,0))}`}</div></div>}
+      <b className="cn">{hov.id}</b><div className="mut">{hov.kind==='emp'?'Bank employee':hov.pred?`PREDICTED: ${Math.round(hov.pred*100)}% likelihood (model estimate)`:`${touch.length} transfers on screen, ${lakh(touch.reduce((s,l)=>s+l.amt,0))}`}</div></div>}
   </div>}
 
+/* ── SAR drawer ── */
 function Sar({sar,onClose}){
   useEffect(()=>{const k=e=>e.key==='Escape'&&onClose();window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k)},[]);
   return <div className="fixed inset-0 z-50 flex justify-end" style={{background:'#0f1a168c'}} onClick={onClose}>
     <div className="slide w-[min(560px,100%)] h-full p-8 overflow-y-auto" style={{background:'#fbfcf8',color:'#16211d','--mut':'#5b6961','--ink':'#16211d','--paper':'#fbfcf8'}} onClick={e=>e.stopPropagation()}>
-      <p className="cn text-xs mut">Draft · written by {sar.model} from the alert’s structured data</p>
-      <h2 className="serif text-2xl font-semibold mt-2">Suspicious Activity Report</h2>
-      <p className="text-sm mut mt-1">Read it through and edit before anything is filed.</p>
+      <p className="cn text-xs mut">Draft · generated by {sar.model} from alert structured evidence</p>
+      <h2 className="serif text-2xl font-semibold mt-2">Suspicious Activity Report (Draft)</h2>
+      <p className="text-sm mut mt-1">Investigative recommendation draft. Review and verify before regulatory submission.</p>
       <pre className="serif mt-6 whitespace-pre-wrap text-[15px] leading-relaxed">{sar.text}</pre>
       <div className="flex gap-2 mt-6"><Btn v="solid" onClick={()=>navigator.clipboard.writeText(sar.text)}>Copy text</Btn>
         <Btn onClick={()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([sar.text]));a.download='SAR-draft.txt';a.click()}}>Download</Btn><Btn v="link" onClick={onClose}>Close</Btn></div></div></div>}
 
+/* ── Evaluation panel (synthetic test harness evaluation) ── */
+function EvalPanel({ev}){
+  const [open,setOpen]=useState(false);
+  if(!ev||!ev.counts)return null;
+  const {counts,metrics}=ev;
+  return <div className="relative">
+    <button onClick={()=>setOpen(o=>!o)} className="rounded-lg px-3.5 py-2 min-w-[92px] text-left transition hover:opacity-80" style={{background:'var(--card)',border:'1px solid var(--rule)'}}>
+      <div className="cn text-xl font-bold leading-none">{pct(metrics.precision)}</div>
+      <div className="text-[11px] mut mt-1 whitespace-nowrap">Precision · {counts.total} scenarios</div></button>
+    {open&&<div className="absolute right-0 top-full mt-1 z-30 rounded-xl p-4 w-80 slide shadow-xl" style={{background:'var(--card)',border:'1px solid var(--rule)',backdropFilter:'blur(16px)'}}>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-bold uppercase tracking-wider mut">SYNTHETIC PROTOTYPE EVALUATION</p>
+        <button onClick={()=>setOpen(false)} className="text-xs mut hover:text-[var(--ink)]">✕</button>
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+        {[['Suspicious',counts.suspicious],['Legitimate',counts.legitimate],['TP',counts.TP],['FP',counts.FP],['FN',counts.FN],['TN',counts.TN]].map(([k,v])=>
+          <div key={k} className="flex justify-between"><span className="mut">{k}</span><span className="cn font-bold">{v}</span></div>)}
+        <div className="col-span-2 border-t mt-1 pt-1" style={{borderColor:'var(--rule)'}}/>
+        {[['Precision',pct(metrics.precision)],['Recall',pct(metrics.recall)],['FPR',pct(metrics.fpr)],['F1',pct(metrics.f1)]].map(([k,v])=>
+          <div key={k} className="flex justify-between"><span className="mut">{k}</span><span className="cn font-bold">{v}</span></div>)}</div>
+      <p className="text-[10.5px] mut mt-3 leading-relaxed">
+        <strong>{counts.total} synthetic scenarios;</strong> planted cases and hard negatives. Evaluated against deterministic ground truth. Not a production benchmark.
+      </p>
+      {ev.scenarios&&ev.scenarios.length>0&&<details className="mt-2.5 pt-2 border-t text-xs" style={{borderColor:'var(--rule)'}}>
+        <summary className="cursor-pointer font-semibold mut hover:text-[var(--ink)]">View {ev.scenarios.length} test scenarios</summary>
+        <div className="mt-2 space-y-1.5 max-h-48 overflow-y-auto pr-1">
+          {ev.scenarios.map(s=><div key={s.scenario_id} className="p-1.5 rounded text-[11px]" style={{background:'rgba(0,0,0,0.04)',border:'1px solid var(--rule)'}}>
+            <div className="flex justify-between font-bold">
+              <span className="cn">{s.scenario_id}</span>
+              <span className="px-1 rounded text-[10px]" style={{background:s.outcome.startsWith('T')?'#3a9e6e22':'#e5484d22',color:s.outcome.startsWith('T')?'#3a9e6e':'#e5484d'}}>{s.outcome}</span>
+            </div>
+            <div className="flex justify-between mut mt-0.5 text-[10.5px]">
+              <span>Truth: {s.label}</span>
+              <span>{s.detected?'Detected':'Not detected'}</span>
+            </div>
+          </div>)}
+        </div>
+      </details>}
+      <button onClick={()=>setOpen(false)} className="mt-3 text-xs underline underline-offset-2 mut hover:text-[var(--ink)]">Close</button></div>}
+  </div>}
 
+/* ── Themes ── */
 const THEMES={ledger:'Ledger',midnight:'Midnight',ember:'Ember',aurora:'Aurora'};
 const SW={ledger:['#e8ede6','#c62828'],midnight:['#0c1324','#5b8cff'],ember:['#1e110c','#ff7a45'],aurora:['#081a16','#2ee6a6']};
+
+/* ── Background + effects ── */
 function Bg(){const ref=useRef();useEffect(()=>{const c=ref.current,x=c.getContext('2d');let raf,w,h;
   const P=Array.from({length:70},()=>({x:Math.random(),y:Math.random(),vx:(Math.random()-.5)*4e-4,vy:(Math.random()-.5)*4e-4}));
   const fit=()=>{w=c.width=innerWidth;h=c.height=innerHeight};fit();addEventListener('resize',fit);
@@ -123,6 +174,8 @@ function CountUp({to}){const [v,setV]=useState(0),p=useRef(0);useEffect(()=>{con
 const BlurText=({text})=><span>{text.split(' ').map((w,i)=><span key={i} className="blurin" style={{animationDelay:i*55+'ms'}}>{w}&nbsp;</span>)}</span>;
 function Spot({children,className='',style}){const r=useRef();return <div ref={r} className={className} style={{...style,position:'relative',overflow:'hidden'}} onMouseMove={e=>{const b=r.current.getBoundingClientRect();r.current.style.setProperty('--mx',e.clientX-b.left+'px');r.current.style.setProperty('--my',e.clientY-b.top+'px')}}>
   <div className="absolute inset-0 pointer-events-none" style={{background:'radial-gradient(190px circle at var(--mx,-999px) var(--my,-999px),var(--spot),transparent 70%)'}}/>{children}</div>}
+
+/* ── Live polling ── */
 function useLive(on){const cb=useRef();cb.current=on;const seen=useRef(0),[s,setS]=useState({n:0,feed:[],spark:[],live:false});
   useEffect(()=>{const id=setInterval(async()=>{try{const d=await api('/api/live?since='+seen.current),first=seen.current===0;seen.current=d.n;
     setS(p=>({n:d.n,live:d.live,feed:[...p.feed,...d.txs].slice(-30),spark:[...p.spark,first?0:d.txs.length].slice(-30)}));cb.current&&cb.current(d)}catch(e){}},1200);return()=>clearInterval(id)},[]);
@@ -134,8 +187,9 @@ function LivePanel({L}){const mx=Math.max(1,...L.spark);
     <div className="flex gap-4 mt-2 items-end"><div><div className="cn text-xl font-bold"><CountUp to={L.n}/></div><div className="text-[11px] mut">transactions scored</div></div>
       <svg viewBox="0 0 90 26" className="flex-1 h-7"><polyline fill="none" stroke="var(--acc)" strokeWidth="1.6" points={L.spark.map((v,i)=>`${i*3},${25-v/mx*22}`).join(' ')}/></svg></div>
     <div className="mt-2 h-20 overflow-hidden text-[11.5px] cn space-y-0.5">{L.feed.slice(-5).reverse().map(t=><div key={t.id} className="blurin" style={{color:t.hot?'#e5484d':'var(--mut)',fontWeight:t.hot?700:400}}>{t.src}→{t.dst} {inr(t.amt)}</div>)}</div>
-    <div className="flex gap-2 mt-2 flex-wrap items-center"><span className="text-[11px] mut">Simulate an attack:</span>{[['ring','Laundering ring'],['structuring','Structuring']].map(([k,l])=><button key={k} onClick={()=>L.inject(k)} className="text-xs px-2 py-1 rounded transition hover:opacity-70" style={{border:'1px solid var(--ink)'}}>{l}</button>)}</div></Spot>}
+    <div className="flex gap-2 mt-2 flex-wrap items-center"><span className="text-[11px] mut">Simulate:</span>{[['ring','Laundering ring'],['structuring','Structuring']].map(([k,l])=><button key={k} onClick={()=>L.inject(k)} className="text-xs px-2 py-1 rounded transition hover:opacity-70" style={{border:'1px solid var(--ink)'}}>{l}</button>)}</div></Spot>}
 
+/* ── Command palette ── */
 function Palette({items,onClose}){const [q,setQ]=useState(''),[i,setI]=useState(0);const f=items.filter(x=>x.l.toLowerCase().includes(q.toLowerCase()));
   useEffect(()=>setI(0),[q]);
   const key=e=>{if(e.key==='Escape')onClose();if(e.key==='ArrowDown'){e.preventDefault();setI(k=>Math.min(k+1,f.length-1))}if(e.key==='ArrowUp'){e.preventDefault();setI(k=>Math.max(k-1,0))}if(e.key==='Enter'&&f[i]){f[i].run();onClose()}};
@@ -143,23 +197,152 @@ function Palette({items,onClose}){const [q,setQ]=useState(''),[i,setI]=useState(
     <div className="slide w-[min(560px,92%)] h-fit rounded-xl overflow-hidden" style={{background:'var(--card)',border:'1px solid var(--rule)',backdropFilter:'blur(16px)'}} onClick={e=>e.stopPropagation()}>
       <input autoFocus value={q} onChange={e=>setQ(e.target.value)} onKeyDown={key} placeholder="Jump to a case or run an action…" className="w-full px-5 py-4 bg-transparent outline-none" style={{borderBottom:'1px solid var(--rule)',color:'var(--ink)'}}/>
       <div className="max-h-72 overflow-y-auto py-1">{f.map((x,k)=><button key={x.l} onClick={()=>{x.run();onClose()}} onMouseEnter={()=>setI(k)} className="w-full text-left px-5 py-2.5 text-sm flex justify-between" style={{background:k===i?'var(--spot)':'transparent'}}><span>{x.l}</span><span className="mut text-xs">{x.h}</span></button>)}{!f.length&&<p className="px-5 py-3 text-sm mut">No matches.</p>}</div></div></div>}
+
+/* ── Evidence item ── */
+function EvidenceItem({e,riskColor}){
+  const text=typeof e==='string'?e:(e.text||'');
+  const kind=kindOf(e);
+  const isObj=typeof e==='object'&&e!==null;
+  const authColor=isObj&&e.authorization?(!e.authorization.allowed?'#e5484d':'#3a9e6e'):null;
+  return <div className="py-3.5" style={{borderBottom:'1px solid var(--rule)'}}>
+    <div className="flex items-center justify-between">
+      <p className="text-xs font-semibold uppercase tracking-wide" style={{color:riskColor}}>{KN[kind]||kind.replace(/_/g,' ')}</p>
+      {e.rule&&<span className="cn text-[10px] px-1.5 py-0.5 rounded" style={{background:'rgba(0,0,0,0.04)',border:'1px solid var(--rule)'}}>{e.rule.replace(/_/g,' ')}</span>}
+    </div>
+    <p className="serif text-[15px] leading-relaxed mt-1">{text}</p>
+    {isObj&&<div className="mt-2.5 space-y-2 text-[12.5px]">
+      {e.authorization&&<div className="p-2.5 rounded text-xs space-y-1.5" style={{background:authColor+'0c',border:`1px solid ${authColor}33`}}>
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-[11px] uppercase tracking-wider mut">Access Context</span>
+          <span className="cn font-bold px-1.5 py-0.5 rounded text-[11px]" style={{background:authColor+'18',color:authColor,border:`1px solid ${authColor}40`}}>
+            {e.authorization.allowed?'AUTHORIZED':'NOT AUTHORIZED'}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11.5px] mt-1">
+          {e.emp&&<div><span className="opacity-60">Employee:</span> <span className="cn font-semibold">{e.emp}</span> {e.authorization.role?`(${e.authorization.role})`:''}</div>}
+          {e.accts&&<div><span className="opacity-60">Account:</span> <span className="cn font-semibold">{e.accts.join(', ')}</span></div>}
+          {e.authorization.action&&<div><span className="opacity-60">Action:</span> <span className="cn font-semibold">{e.authorization.action}</span></div>}
+          {e.authorization.entitlement_source&&<div><span className="opacity-60">Source:</span> <span className="cn">{e.authorization.entitlement_source}</span></div>}
+          {e.authorization.reason&&<div className="col-span-2"><span className="opacity-60">Reason:</span> <span className="font-medium">{e.authorization.reason}</span></div>}
+        </div>
+      </div>}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 mut mt-1">
+        {e.observed?.access_sequence&&<div className="col-span-2"><span className="opacity-60">Access sequence:</span> <span className="cn text-[11.5px] font-semibold">{e.observed.access_sequence}</span></div>}
+        {e.observed?.amount!==undefined&&<div><span className="opacity-60">Amount:</span> <span className="cn text-[11.5px] font-semibold">{lakh(e.observed.amount)}</span></div>}
+        {e.parameters?.amount_threshold!==undefined&&<div><span className="opacity-60">Threshold:</span> <span className="cn text-[11.5px]">{lakh(e.parameters.amount_threshold)}</span></div>}
+        {e.parameters?.window_minutes!==undefined&&<div><span className="opacity-60">Window:</span> <span className="cn text-[11.5px]">{e.parameters.window_minutes} min</span></div>}
+        {e.parameters?.window_hours!==undefined&&<div><span className="opacity-60">Window:</span> <span className="cn text-[11.5px]">{e.parameters.window_hours}h</span></div>}
+        {e.observed?.delay_minutes!==undefined&&<div><span className="opacity-60">Observed delay:</span> <span className="cn text-[11.5px] font-semibold">{Math.round(e.observed.delay_minutes)} min</span></div>}
+        {e.observed?.count!==undefined&&<div><span className="opacity-60">Count:</span> <span className="cn text-[11.5px]">{e.observed.count} transfers</span></div>}
+        {e.observed?.destinations!==undefined&&<div><span className="opacity-60">Recipients:</span> <span className="cn text-[11.5px]">{e.observed.destinations}</span></div>}
+        {e.observed?.anomaly_score!==undefined&&<div><span className="opacity-60">Anomaly score:</span> <span className="cn text-[11.5px]">{e.observed.anomaly_score}</span></div>}
+        {e.observed?.declared_income!==undefined&&<div><span className="opacity-60">Declared income:</span> <span className="cn text-[11.5px]">{lakh(e.observed.declared_income)}/mo</span></div>}
+        {e.observed?.hops!==undefined&&<div><span className="opacity-60">Hops:</span> <span className="cn text-[11.5px] font-semibold">{e.observed.hops} hops</span></div>}
+        {e.observed?.total!==undefined&&<div><span className="opacity-60">Total moved:</span> <span className="cn text-[11.5px] font-semibold">{lakh(e.observed.total)}</span></div>}
+        {e.parameters?.schedule_start!==undefined&&<div><span className="opacity-60">Schedule:</span> <span className="cn text-[11.5px]">{e.parameters.schedule_start}:00–{e.parameters.schedule_end}:00</span></div>}
+      </div>
+      {e.tx&&e.tx.length>0&&<div className="mut"><span className="opacity-60">Transactions:</span> <span className="cn text-[11.5px]">{e.tx.join(', ')}</span></div>}
+      {e.accts&&e.accts.length>0&&!e.authorization&&<div className="mut"><span className="opacity-60">Accounts:</span> <span className="cn text-[11.5px]">{e.accts.join(', ')}</span></div>}
+      {e.emp&&!e.authorization&&<div className="mut"><span className="opacity-60">Employee:</span> <span className="cn text-[11.5px]">{e.emp}</span></div>}
+    </div>}
+  </div>}
+
+/* ── Case tab with notes/disposition/escalation ── */
+function CaseTab({d,onUpdate,say}){
+  const [noteText,setNoteText]=useState('');
+  const [noteActor,setNoteActor]=useState('analyst');
+  const [addingNote,setAddingNote]=useState(false);
+
+  const submitNote=async()=>{
+    if(!noteText.trim())return;
+    setAddingNote(true);
+    const updated=await postJ(`/api/alerts/${d.id}/note`,{note:noteText.trim(),actor:noteActor});
+    setNoteText('');setAddingNote(false);onUpdate(updated);say('Note added');
+  };
+
+  const STATUSES=['OPEN','ASSIGNED','UNDER_REVIEW','ESCALATED','CLOSED'];
+  const DISPS=['NONE','CONFIRMED_SUSPICIOUS','FALSE_POSITIVE','BENIGN_LEGITIMATE','ESCALATED'];
+  const DISP_LABELS={NONE:'No disposition',CONFIRMED_SUSPICIOUS:'Confirmed suspicious',FALSE_POSITIVE:'False positive',BENIGN_LEGITIMATE:'Benign / legitimate',ESCALATED:'Escalated for FIU review'};
+
+  return <div className="mt-4 space-y-5">
+    {/* Case & Alert ID Header */}
+    <div className="flex items-center justify-between p-2.5 rounded text-xs" style={{background:'rgba(0,0,0,0.03)',border:'1px solid var(--rule)'}}>
+      <div><span className="mut uppercase text-[10px] block">Case ID</span> <span className="cn font-bold text-sm">{d.id}</span></div>
+      <div><span className="mut uppercase text-[10px] block">Alert ID</span> <span className="cn font-bold text-sm">{d.id}</span></div>
+      <div><span className="mut uppercase text-[10px] block">Status</span> <span className="cn font-semibold">{d.status}</span></div>
+    </div>
+
+    {/* Assignment + status */}
+    <div className="grid grid-cols-2 gap-2">
+      <div>
+        <label className="text-xs mut block mb-1">Assign to</label>
+        <select id="case-assign-select" value={d.assignee||''} onChange={async e=>{const u=await post(`/api/alerts/${d.id}/assign`,e.target.value);onUpdate(u);say('Assigned to '+e.target.value)}}
+          className="w-full rounded text-sm px-2.5 py-1.5" style={{background:'var(--card)',color:'var(--ink)',border:'1px solid var(--rule)'}}>
+          <option value="">Unassigned</option>{['A. Rao','P. Iyer','S. Khan'].map(n=><option key={n}>{n}</option>)}</select>
+      </div>
+      <div>
+        <label className="text-xs mut block mb-1">Status</label>
+        <select id="case-status-select" value={d.status||'OPEN'} onChange={async e=>{const u=await post(`/api/alerts/${d.id}/status`,e.target.value);onUpdate(u);say('Status: '+e.target.value)}}
+          className="w-full rounded text-sm px-2.5 py-1.5" style={{background:'var(--card)',color:'var(--ink)',border:'1px solid var(--rule)'}}>
+          {STATUSES.map(s=><option key={s}>{s}</option>)}</select>
+      </div>
+    </div>
+
+    {/* Disposition */}
+    <div>
+      <label className="text-xs mut block mb-1">Disposition</label>
+      <select id="case-disp-select" value={d.disposition||'NONE'} onChange={async e=>{const u=await post(`/api/alerts/${d.id}/disposition`,e.target.value);onUpdate(u);say('Disposition: '+e.target.value)}}
+        className="w-full rounded text-sm px-3 py-1.5" style={{background:'var(--card)',color:DK[d.disposition||'NONE'],border:'1px solid var(--rule)',fontWeight:600}}>
+        {DISPS.map(s=><option key={s} style={{color:DK[s]}}>{s}</option>)}</select>
+      {d.disposition&&d.disposition!=='NONE'&&<p className="text-xs mut mt-1">{DISP_LABELS[d.disposition]||d.disposition}</p>}
+    </div>
+
+    {/* Escalate shortcut */}
+    <Btn id="case-escalate-btn" v="danger" onClick={async()=>{const u=await post(`/api/alerts/${d.id}/escalate`,'');onUpdate(u);say('Case escalated for FIU review')}}>⬆ Escalate for FIU Review</Btn>
+
+    {/* Reviewer notes */}
+    <div>
+      <p className="text-xs mut mb-2 font-semibold">Reviewer notes</p>
+      {(d.reviewer_notes||[]).length===0&&<p className="text-sm mut italic">No notes yet.</p>}
+      {(d.reviewer_notes||[]).map((n,i)=><div key={i} className="py-2" style={{borderBottom:'1px solid var(--rule)'}}>
+        <p className="cn text-[11px] mut">{n.by} · {new Date(n.ts).toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'})}</p>
+        <p className="text-sm mt-0.5 leading-snug">{n.note}</p></div>)}
+      <div className="mt-3 space-y-2">
+        <div className="flex gap-2">
+          <input id="note-actor-input" value={noteActor} onChange={e=>setNoteActor(e.target.value)} placeholder="Your name" className="rounded text-sm px-2.5 py-1.5 w-28 shrink-0" style={{background:'var(--card)',color:'var(--ink)',border:'1px solid var(--rule)'}}/>
+          <textarea id="note-text-area" value={noteText} onChange={e=>setNoteText(e.target.value)} placeholder="Add an investigative note…" rows="2"
+            className="flex-1 rounded text-sm px-2.5 py-1.5 resize-none" style={{background:'var(--card)',color:'var(--ink)',border:'1px solid var(--rule)'}}/>
+        </div>
+        <Btn id="add-note-btn" v="solid" busy={addingNote} onClick={submitNote}>Add note</Btn>
+      </div>
+    </div>
+
+    {/* Audit trail */}
+    <div>
+      <p className="text-xs mut mb-1 font-semibold">Audit trail</p>
+      {d.audit.map((a,i)=><p key={i} className="text-sm py-2.5 leading-snug" style={{borderBottom:'1px solid var(--rule)'}}>
+        <b className="cn text-[13px]">{a.by}</b><br/><span className={a.by.includes('agent')?'serif italic':''}>{a.note}</span></p>)}</div>
+  </div>}
+
+/* ── Main App ── */
 function App(){
   const [list,setList]=useState([]),[sum,setSum]=useState(null),[sel,setSel]=useState(null),[d,setD]=useState(null),[pred,setPred]=useState(null),
     [sar,setSar]=useState(null),[busy,setBusy]=useState(''),[q,setQ]=useState('All'),[tab,setTab]=useState('Evidence'),[toast,setToast]=useState('');
-  const say=m=>{setToast(m);setTimeout(()=>setToast(''),2200)};
+  const say=m=>{setToast(m);setTimeout(()=>setToast(''),2500)};
   const load=()=>api('/api/alerts').then(setList);
   const pick=i=>{setSel(i);setPred(null);setD(null);setTab('Evidence');api('/api/alerts/'+i).then(setD)};
-  const refresh=async()=>setD(await api('/api/alerts/'+sel));
+  const refresh=async()=>{const updated=await api('/api/alerts/'+sel);setD(updated);return updated};
+  const onUpdate=updated=>{setD(updated);load()};
   useEffect(()=>{load();api('/api/summary').then(setSum)},[]);
   useEffect(()=>{if(list.length&&!sel)pick(list[0].id)},[list]);
   const shown=list.filter(a=>q==='All'||a.risk===q.toUpperCase());
-  useEffect(()=>{const k=e=>{if(/SELECT|INPUT/.test(e.target.tagName))return;const i=shown.findIndex(a=>a.id===sel);if(e.key==='j'&&shown[i+1])pick(shown[i+1].id);if(e.key==='k'&&shown[i-1])pick(shown[i-1].id)};window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k)});
+  useEffect(()=>{const k=e=>{if(/SELECT|INPUT|TEXTAREA/.test(e.target.tagName))return;const i=shown.findIndex(a=>a.id===sel);if(e.key==='j'&&shown[i+1])pick(shown[i+1].id);if(e.key==='k'&&shown[i-1])pick(shown[i-1].id)};window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k)});
   const run=async(k,fn)=>{setBusy(k);await fn();setBusy('')};
   const E=sum&&sum.eval;
   const [theme,setTheme]=useState(localStorage.getItem('st')||'ledger');
   const cycle=()=>setTheme(t=>{const o=Object.keys(THEMES);return o[(o.indexOf(t)+1)%o.length]});
   useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('st',theme)},[theme]);
-  useEffect(()=>{const k=e=>{if(e.key==='t'&&!/SELECT|INPUT/.test(e.target.tagName))setTheme(t=>{const o=Object.keys(THEMES);return o[(o.indexOf(t)+1)%o.length]})};addEventListener('keydown',k);return()=>removeEventListener('keydown',k)},[]);
+  useEffect(()=>{const k=e=>{if(e.key==='t'&&!/SELECT|INPUT|TEXTAREA/.test(e.target.tagName))setTheme(t=>{const o=Object.keys(THEMES);return o[(o.indexOf(t)+1)%o.length]})};addEventListener('keydown',k);return()=>removeEventListener('keydown',k)},[]);
   const same=(p,n)=>JSON.stringify(p)===JSON.stringify(n)?p:n;
   const L=useLive(x=>{setList(p=>same(p,x.alerts));setSum(p=>same(p,x.summary));x.events.forEach(e=>say(`New ${e.risk.toLowerCase()}-risk alert ${e.id} caught live`))});
   useEffect(()=>{const a=list.find(x=>x.id===sel);if(a&&d&&d.id===sel&&(a.risk!==d.risk||a.total!==d.total||a.accounts.length!==d.accounts.length))refresh()},[list]);
@@ -171,14 +354,21 @@ function App(){
     setTab('Timeline');await w(2400);setTab('Evidence');setSar(await api(`/api/alerts/${top.id}/sar`));await w(5000);setSar(null);setAuto(false)};
   const items=[...list.map(a=>({l:`Open ${a.id} · ${a.risk.toLowerCase()} risk`,h:'case',run:()=>pick(a.id)})),{l:'Change theme',h:'t',run:cycle},{l:L.live?'Pause live analysis':'Go live',h:'live',run:L.toggle},
     {l:'Simulate a laundering ring',h:'attack',run:()=>L.inject('ring')},{l:'Simulate structuring',h:'attack',run:()=>L.inject('structuring')},{l:'Run the autopilot demo',h:'demo',run:demo},{l:'Print case file / save PDF',h:'pdf',run:()=>window.print()}];
+
   return <div className="h-screen flex flex-col"><Bg/><ClickSpark/>
     <header className="px-6 py-4 flex flex-wrap items-end gap-x-8 gap-y-2 shrink-0" style={{borderBottom:'1px solid var(--rule)'}}>
       <div className="flex items-center gap-4"><div className="flex items-baseline gap-3"><h1 className="serif text-2xl font-semibold shiny">Sentinel</h1><span className="text-sm mut">investigations desk</span></div>
       <button onClick={cycle} title="Change theme (t)" className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full transition hover:opacity-75" style={{border:'1px solid var(--rule)',background:'var(--card)'}}><i className="w-3.5 h-3.5 rounded-full" style={{background:`linear-gradient(135deg,${SW[theme][0]} 50%,${SW[theme][1]} 50%)`,boxShadow:'0 0 0 1px var(--rule)'}}/>{THEMES[theme]}</button>
       <button onClick={demo} disabled={auto} className="text-xs px-3 py-1.5 rounded-full transition hover:opacity-75 disabled:opacity-60" style={{background:'var(--ink)',color:'var(--paper)'}}>{auto?'Autopilot running…':'▶ Autopilot demo'}</button>
       <button onClick={()=>setPal(true)} className="hidden md:block text-xs px-2.5 py-1.5 rounded-full" style={{border:'1px solid var(--rule)'}}><kbd>Ctrl</kbd> <kbd>K</kbd></button></div>
-      {E&&<div className="ml-auto hidden md:flex gap-2.5">{[['Open alerts',list.filter(a=>!['CLOSED','AUTO_TRIAGED'].includes(a.status)).length,''],['High risk',list.filter(a=>a.risk==='HIGH').length,''],['Flagged flow, ₹ lakh',Math.round(list.reduce((t,a)=>t+(a.risk==='LOW'?0:a.total),0)/1e5),''],['Precision, test set',Math.round(E.precision*100),'%'],['Closed by agent',E.auto_triaged,'']].map(([k,v,u])=>
-        <Spot key={k} className="rounded-lg px-3.5 py-2 min-w-[92px]" style={{background:'var(--card)',border:'1px solid var(--rule)'}}><div className="cn text-xl font-bold leading-none"><CountUp to={v}/>{u}</div><div className="text-[11px] mut mt-1 whitespace-nowrap">{k}</div></Spot>)}</div>}
+      {E&&<div className="ml-auto hidden md:flex gap-2.5">
+        {[['Open alerts',list.filter(a=>!['CLOSED','AUTO_TRIAGED'].includes(a.status)).length,''],
+          ['High risk',list.filter(a=>a.risk==='HIGH').length,''],
+          ['Flagged flow, lakh',Math.round(list.reduce((t,a)=>t+(a.risk==='LOW'?0:a.total),0)/1e5),''],
+          ['Closed by agent',E.auto_triaged,'']].map(([k,v,u])=>
+          <Spot key={k} className="rounded-lg px-3.5 py-2 min-w-[92px]" style={{background:'var(--card)',border:'1px solid var(--rule)'}}><div className="cn text-xl font-bold leading-none"><CountUp to={v}/>{u}</div><div className="text-[11px] mut mt-1 whitespace-nowrap">{k}</div></Spot>)}
+        <EvalPanel ev={E}/>
+      </div>}
     </header>
     <div className="flex flex-1 min-h-0 flex-col lg:flex-row">
       <aside className="lg:w-80 lg:border-r overflow-y-auto shrink-0 max-h-52 lg:max-h-none" style={{borderColor:'var(--rule)'}}>
@@ -186,36 +376,46 @@ function App(){
         {shown.map(a=><button key={a.id} onClick={()=>pick(a.id)} className="w-full text-left px-4 py-3.5 transition hover:bg-white/50" style={{borderBottom:'1px solid var(--rule)',background:sel===a.id?'var(--card)':'transparent',boxShadow:sel===a.id?'inset 3px 0 0 var(--ink)':'none'}}>
           <div className="flex justify-between items-baseline"><span className="cn font-bold">{a.id}</span><span className="text-xs font-semibold" style={{color:RK[a.risk]}}>{a.risk.toLowerCase()} risk</span></div>
           <p className="serif text-[14.5px] mt-1 leading-snug line-clamp-2">{a.explanation}</p>
-          <div className="flex justify-between text-xs mt-1.5 mut"><span>{a.kinds.map(k=>KN[k].toLowerCase()).join(', ')}</span><span className="whitespace-nowrap ml-2">{a.status==='AUTO_TRIAGED'?'closed by agent':a.total?lakh(a.total):a.status.toLowerCase()}</span></div></button>)}
+          <div className="flex justify-between text-xs mt-1.5 mut"><span>{a.kinds.map(k=>(KN[k]||k).toLowerCase()).join(', ')}</span>
+            <span className="whitespace-nowrap ml-2 flex items-center gap-1.5">
+              {a.disposition&&a.disposition!=='NONE'&&<span style={{color:DK[a.disposition],fontSize:9,fontWeight:700}}>{a.disposition.replace(/_/g,' ')}</span>}
+              {a.status==='AUTO_TRIAGED'?'closed by agent':a.total?'₹'+(a.total/1e5).toFixed(1)+'L':a.status.toLowerCase()}</span></div></button>)}
         {!shown.length&&<p className="text-sm mut p-4">Nothing at this level right now.</p>}
         <p className="text-xs mut p-4 hidden lg:block leading-loose"><kbd>j</kbd> <kbd>k</kbd> cases · <kbd>t</kbd> theme · <kbd>Ctrl</kbd> <kbd>K</kbd> search</p>
       </aside>
       <main className="flex-1 relative min-w-0 min-h-[50vh]" style={{background:'var(--stage)'}}>{d&&d.id===sel?<Graph alert={d} pred={pred}/>:<p className="p-8 text-sm" style={{color:'#8fa398'}}>Pulling the case file…</p>}</main>
       <aside className="lg:w-[26rem] lg:border-l overflow-y-auto shrink-0" style={{borderColor:'var(--rule)',background:'var(--card)'}}>{d?<div className="p-6 print-area" key={d.id}>
         <div className="flex items-start justify-between"><div><p className="text-xs mut">Case file</p><h2 className="cn text-xl font-bold">{d.id}</h2></div><span className="stamp" style={{color:RK[d.risk]}}>{d.risk}</span></div>
-        <p className="serif text-[16px] leading-relaxed mt-4"><BlurText key={d.id+d.explanation} text={d.explanation}/></p>
-        <p className="text-sm mut mt-2">{d.total?`${lakh(d.total)} flagged across ${d.accounts.length} accounts.`:`${d.accounts.length} account under review.`}</p>
+        {/* Synthesized correlated narrative */}
+        {d.narrative?<div className="mt-3 p-3 rounded text-sm leading-relaxed" style={{background:'rgba(63,75,184,.12)',borderLeft:'3px solid var(--acc2)'}}><span className="text-xs font-semibold uppercase tracking-wide mut">Correlated finding </span><p className="serif mt-1">{d.narrative}</p></div>
+          :<p className="serif text-[16px] leading-relaxed mt-4"><BlurText key={d.id+d.explanation} text={d.explanation}/></p>}
+        <p className="text-sm mut mt-2">{d.total?`₹${(d.total/1e5).toFixed(1)}L flagged across ${d.accounts.length} accounts.`:`${d.accounts.length} account under review.`}</p>
+        {d.disposition&&d.disposition!=='NONE'&&<p className="text-xs mt-1 font-semibold" style={{color:DK[d.disposition]}}>{d.disposition.replace(/_/g,' ')}</p>}
         <div className="flex flex-wrap items-center gap-2 mt-5">
-          <Btn v="solid" busy={busy==='s'} onClick={()=>run('s',async()=>{setSar(await api(`/api/alerts/${d.id}/sar`));await refresh()})}>Draft SAR</Btn>
-          <Btn busy={busy==='p'} onClick={()=>run('p',async()=>{setPred(await api(`/api/alerts/${d.id}/predict`));await refresh();say('Guesses for the next hop are on the graph')})}>Where next?</Btn>
+          <Btn id="draft-sar-btn" v="solid" busy={busy==='s'} onClick={()=>run('s',async()=>{setSar(await api(`/api/alerts/${d.id}/sar`));await refresh()})}>Draft SAR</Btn>
+          <Btn id="where-next-btn" busy={busy==='p'} onClick={()=>run('p',async()=>{setPred(await api(`/api/alerts/${d.id}/predict`));await refresh();say('Guesses for the next hop are on the graph')})}>Where next?</Btn>
           <Btn v="link" onClick={()=>{window.open(`/api/alerts/${d.id}/export`);say('Evidence bundle downloaded')}}>Export evidence</Btn><Btn v="link" onClick={()=>window.print()}>Print / PDF</Btn></div>
         <div className="flex gap-5 mt-6" style={{borderBottom:'1px solid var(--rule)'}}>{['Evidence','Timeline','Case'].map(t=><button key={t} onClick={()=>setTab(t)} className="pb-2 text-sm transition" style={{fontWeight:tab===t?600:400,color:tab===t?'var(--ink)':'var(--mut)',boxShadow:tab===t?'0 2px 0 var(--ink)':'none'}}>{t}</button>)}</div>
         <div className="mt-2">
         {tab==='Evidence'&&<>
-          {pred&&<div className="my-3 p-3.5 rounded text-sm" style={{background:'rgba(217,138,18,.18)',borderLeft:'3px solid #d98a12'}}>
-            <p className="font-semibold">If the money keeps moving from {pred.tail}, the model’s top guesses are:</p>
-            {pred.candidates.map(c=><p key={c.id} className="mt-1"><span className="cn font-bold">{c.id}</span> <span className="mut">{Math.round(c.prob*100)}% · {c.why}</span></p>)}
-            <p className="text-xs mut mt-2">A prediction, not an observation.</p></div>}
-          {d.evidence.map((e,i)=><div key={i} className="py-3.5" style={{borderBottom:'1px solid var(--rule)'}}>
-            <p className="text-xs font-semibold" style={{color:RK[d.risk]}}>{KN[kindOf(e)]}</p><p className="serif text-[15px] leading-relaxed mt-1">{e}</p></div>)}</>}
+          {pred&&<div className="my-3 p-3.5 rounded text-sm" style={{background:'rgba(217,138,18,.14)',borderLeft:'3px solid #d98a12',border:'1px solid var(--rule)'}}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold cn" style={{background:'#d98a1222',color:'#d98a12',border:'1px solid #d98a1266'}}>PREDICTED</span>
+              <span className="font-semibold text-xs mut uppercase tracking-wider">Next-Hop Model Prediction</span>
+            </div>
+            <p className="text-xs mut">Statistical next-hop candidate estimate from tail account <span className="cn font-bold">{pred.tail}</span> (predictive model output, not confirmed transaction):</p>
+            <div className="mt-2 space-y-1.5">
+              {pred.candidates.map(c=><div key={c.id} className="flex justify-between items-baseline text-xs p-1.5 rounded" style={{background:'rgba(0,0,0,0.03)',border:'1px solid var(--rule)'}}>
+                <span className="cn font-bold">{c.id}</span>
+                <span className="cn font-semibold" style={{color:'#d98a12'}}>{Math.round(c.prob*100)}% confidence</span>
+                <span className="mut text-[11px] truncate max-w-[170px]">{c.why}</span>
+              </div>)}
+            </div>
+          </div>}
+          {d.evidence.map((e,i)=><EvidenceItem key={i} e={e} riskColor={RK[d.risk]}/>)}</>}
         {tab==='Timeline'&&<ol className="mt-4 ml-1.5 pl-5 space-y-4" style={{borderLeft:'1px solid var(--rule)'}}>{d.timeline.map((t,i)=><li key={i} className="relative">
           <i className="absolute -left-[26px] top-1 w-2 h-2 rounded-full" style={{background:t.kind==='emp'?'#3f4bb8':'#c62828'}}/><p className="cn text-[13px]" style={{color:t.kind==='emp'?'#3f4bb8':'var(--ink)'}}>{t.text}</p></li>)}</ol>}
-        {tab==='Case'&&<div className="mt-4">
-          <div className="flex gap-2"><select value={d.assignee||''} onChange={async e=>{setD(await post(`/api/alerts/${d.id}/assign`,e.target.value));load();say('Assigned to '+e.target.value)}} className="flex-1 rounded text-sm px-3 py-2" style={{background:'var(--card)',color:'var(--ink)',border:'1px solid var(--rule)'}}>
-            <option value="">Assign to…</option>{['A. Rao','P. Iyer','S. Khan'].map(n=><option key={n}>{n}</option>)}</select>
-            <Btn onClick={async()=>{setD(await post(`/api/alerts/${d.id}/status`,'CLOSED'));load();say('Case closed')}}>Close case</Btn></div>
-          <p className="text-xs mut mt-5 mb-1">Audit trail</p>
-          {d.audit.map((a,i)=><p key={i} className="text-sm py-2.5 leading-snug" style={{borderBottom:'1px solid var(--rule)'}}><b className="cn text-[13px]">{a.by}</b><br/><span className={a.by.includes('agent')?'serif italic':''}>{a.note}</span></p>)}</div>}
+        {tab==='Case'&&<CaseTab d={d} onUpdate={onUpdate} say={say}/>}
         </div></div>:<p className="p-6 text-sm mut">Pulling the case file…</p>}</aside>
     </div>
     {pal&&<Palette items={items} onClose={()=>setPal(false)}/>}

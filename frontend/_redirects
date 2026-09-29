@@ -1,2 +1,2 @@
-# Replace with your Render URL, keep /api/:splat and the trailing 200
-/api/*  https://YOUR-SENTINEL-API.onrender.com/api/:splat  200
+# Production Render API proxy
+/api/*  https://sentinel-api-1xou.onrender.com/api/:splat  200
