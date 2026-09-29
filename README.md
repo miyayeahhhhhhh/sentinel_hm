@@ -34,5 +34,5 @@ backend/engine.py  backend/app.py  frontend/index.html  requirements.txt
 `Go live` (left panel) starts a simulated stream: a new transaction every ~1.2s, detectors re-run every ~5s, and new alerts appear with a toast. `Simulate an attack` injects a laundering ring (with an insider edit) or a structuring run into the stream. The frontend polls `/api/live`.
 Themes: Ledger, Midnight, Ember, Aurora (dots in the header, or press `t`). Animated components (aurora + particle background, click sparks, count-up, blur text, spotlight cards, shiny text) are dependency-free re-creations in the style of React Bits.
 
-## Deploy
+## Deploy:
 Backend (Python) on Render via `render.yaml`; frontend (static) on Netlify. Netlify proxies `/api/*` to the backend through `frontend/_redirects` (edit the URL). Or deploy only the backend on Render: it also serves the UI at its root URL.
